@@ -1,0 +1,51 @@
+# Data
+data/
+*.csv
+*.json
+*.hdf5
+*.h5
+*.pkl
+*.parquet
+
+# Model checkpoints and outputs
+checkpoints/
+outputs/
+runs/
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Kaggle credentials
+kaggle.json
+.kaggle/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+wandb/
+lightning_logs/
