@@ -4,23 +4,28 @@ from torch.cuda.amp import GradScaler  # mixed precision training: https://pytor
 
 
 # Train loop: iterate over the training dataset and try to converge to optimal parameters
-def train_loop(dataloader, model, loss_fn, optimizer):
+# scaler: GradScaler instance — create once before the epoch loop and pass in each epoch
+#         so its scale history persists across epochs. If None, a new one is created per call.
+def train_loop(dataloader, model, loss_fn, optimizer, scaler=None):
   device = next(model.parameters()).device
-  scaler = GradScaler()
+  use_amp = device.type == 'cuda'
+  if scaler is None:
+    scaler = GradScaler(enabled=use_amp)
+
   size = len(dataloader.dataset)
   num_batches = len(dataloader)
   model.train() # Set model to training mode
   total_loss, correct = 0, 0 # track totals across all batches
 
   for batch, (X, y) in enumerate(dataloader):
-    # Compute prediction and loss
-    X = X.to(device)
-    y = y.to(device)
-    pred = model(X)
-    loss = loss_fn(pred, y)
+    X, y = X.to(device), y.to(device)
 
-    # Backpropagation
-    optimizer.zero_grad()   # reset gradients of model parameters to zero at each iteration since gradients by default add up
+    # autocast enables float16 on CUDA for the forward pass; is a no-op on CPU
+    with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=use_amp):
+      pred = model(X)
+      loss = loss_fn(pred, y)
+
+    optimizer.zero_grad()        # reset gradients of model parameters to zero at each iteration since gradients by default add up
     scaler.scale(loss).backward()         # backpropogate the prediction loss -- scaled gradients
     scaler.step(optimizer)       # adjust parameters by gradients collected in the backward pass
     scaler.update()              # update scaler parameters
@@ -29,8 +34,8 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     correct += (pred.argmax(1) == y).type(torch.float).sum().item() # accumulate correct predictions
 
     if batch % 20 == 0:
-        loss, current = loss.item(), (batch + 1) * len(X)
-        print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+      current = (batch + 1) * len(X)
+      print(f"loss: {loss.item():>7f}  [{current:>5d}/{size:>5d}]")
 
   avg_loss = total_loss / num_batches   # average over batches
   accuracy = correct / size             # fraction correct over full dataset
