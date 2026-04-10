@@ -43,25 +43,27 @@ def train_loop(dataloader, model, loss_fn, optimizer, scaler=None):
 
 
 # Validation/Test loop: iterate over the test dataset to check if model performance is improving
+# Returns (avg_loss, top1_acc, top3_acc)
 def test_loop(dataloader, model, loss_fn):
   device = next(model.parameters()).device
   size = len(dataloader.dataset)
   num_batches = len(dataloader)
-  test_loss, correct = 0, 0
+  test_loss, top1_correct, top3_correct = 0, 0, 0
   model.eval() # Set model to evaluation mode
 
   with torch.no_grad():
     for X, y in dataloader:
-      X = X.to(device)
-      y = y.to(device)
+      X, y = X.to(device), y.to(device)
       pred = model(X)
       test_loss += loss_fn(pred, y).item()
-      correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+      top1_correct += (pred.argmax(1) == y).sum().item()
+      top3_correct += pred.topk(3, dim=1).indices.eq(y.unsqueeze(1)).any(dim=1).sum().item()
 
-  test_loss /= num_batches
-  correct /= size
-  print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
-  return test_loss, correct
+  test_loss  /= num_batches
+  top1_acc    = top1_correct / size
+  top3_acc    = top3_correct / size
+  print(f"Val — loss: {test_loss:.4f}  top-1: {top1_acc:.2%}  top-3: {top3_acc:.2%}")
+  return test_loss, top1_acc, top3_acc
 
 def plot_history(history, model_name="Model"):
     epochs = range(1, len(history['train_loss']) + 1)
@@ -76,9 +78,11 @@ def plot_history(history, model_name="Model"):
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
-    # Accuracy
-    ax2.plot(epochs, history['train_acc'], 'r--', label='Train Acc')
-    ax2.plot(epochs, history['val_acc'],   'r-',  label='Val Acc')
+    # Accuracy (top-1, and top-3 if tracked)
+    ax2.plot(epochs, history['train_acc'], 'r--', label='Train Top-1')
+    ax2.plot(epochs, history['val_acc'],   'r-',  label='Val Top-1')
+    if 'val_top3' in history:
+        ax2.plot(epochs, history['val_top3'], 'g-', label='Val Top-3')
     ax2.set_title(f'{model_name} — Accuracy')
     ax2.set_xlabel('Epoch')
     ax2.set_ylabel('Accuracy')

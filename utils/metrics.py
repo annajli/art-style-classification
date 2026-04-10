@@ -9,6 +9,12 @@ def accuracy(outputs: torch.Tensor, labels: torch.Tensor) -> float:
     return (preds == labels).float().mean().item()
 
 
+def topk_accuracy(outputs: torch.Tensor, labels: torch.Tensor, k: int = 3) -> float:
+    _, top_k_preds = outputs.topk(k, dim=1)
+    correct = top_k_preds.eq(labels.unsqueeze(1).expand_as(top_k_preds))
+    return correct.any(dim=1).float().mean().item()
+
+
 def print_classification_report(all_labels, all_preds, class_names):
     print(classification_report(all_labels, all_preds, target_names=class_names))
 
